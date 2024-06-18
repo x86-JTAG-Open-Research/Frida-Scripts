@@ -12,17 +12,22 @@ def attach(pid):
     global session
     session = frida.attach(pid)
     script = session.create_script("""
-        var counter = 0;
+        const resolver = new ApiResolver('module');
+        const matches = resolver.enumerateMatches('exports:xerces-c_*_*.dll!??0MemBufInputSource@xercesc_*_*@@QAE@QBE*QBD_NQAVMemoryManager@1@@Z');
 
-        Interceptor.attach(Module.findExportByName('xerces-c_3_1.dll', '??0MemBufInputSource@xercesc_3_1@@QAE@QBEKQBD_NQAVMemoryManager@1@@Z'), {
+        var callCounter = 0;
+
+        Interceptor.attach(matches[0].address, {
             onEnter: function(args) {
                 send("MemBufInputSource Class Constructor Called");
 
-                this.outpath = Process.getCurrentDir() + "\\\\MemBufInputSource_" + counter.toString() + "_" + ptr(args[0]).toString() + ".xml";
+                this.byteCount = ptr(args[1]).toInt32();
+                this.srcDocBytes = ptr(args[0]).readAnsiString(this.byteCount);
+                this.outFilePath = Process.getCurrentDir() + "\\\\MemBufInputSource_" + callCounter.toString() + "_" + ptr(args[0]).toString() + ".xml";
                 
-                File.writeAllText(this.outpath, ptr(args[0]).readCString());
+                File.writeAllText(this.outFilePath, this.srcDocBytes);
 
-                counter++;
+                callCounter++;
             }
         });
     """)
